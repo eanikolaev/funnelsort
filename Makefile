@@ -1,5 +1,5 @@
 all:
-	gcc -W -Wall -Werror sort.c main.c -o sort
+	gcc -W -Wall -Werror sort.c main.c -o sort -lm
 
 test:
 	./sort

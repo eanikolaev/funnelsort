@@ -4,6 +4,6 @@
 
 typedef int (*cmp_t)(const void *, const void *);
 void
-sort(void *ptr, size_t nmemb, size_t size, cmp_t cmp);
+sort(void *ptr, const size_t nmemb, const size_t size, const cmp_t cmp);
 
 #endif /* INCLUDES_FUNNELSORT_SORT_H */
