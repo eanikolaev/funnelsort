@@ -55,14 +55,15 @@ print_funnel(struct funnel *funnel, int shift)
         printf("%*s" "%s\n", shift+2, " ", "NULL");
         return;
     }
-    printf("%*s" "%s\n", shift, " ", "Funnel");
+    printf("%*s" "\n%s\n", shift, " ", "***FUNNEL***");
 
-    printf("%*s" "%s\n", shift+2, " ", "out buffer");
+    printf("%*s" "%s\n", shift+2, " ", "OUTPUT BUFFER");
     print_buffer(funnel->out, shift+2);
 
-    printf("%*s" "%s\n", shift+2, " ", "top funnel");
+    printf("%*s" "%s\n", shift+2, " ", "TOP FUNNEL");
     print_funnel(funnel->top, shift+4);
-    
+
+    printf("INTERMEDIATE BUFFERS, BOTTOM FUNNELS:\n");    
     size_t i;
     for (i=0; i<funnel->bb_count; i++) {
         printf("%*s" "%s %d:\n", shift, " ", "intermediate buffer", (int)i);
@@ -72,7 +73,7 @@ print_funnel(struct funnel *funnel, int shift)
         print_funnel(funnel->bottom[i], shift+4);        
     }
 
-    printf("%*s" "%s\n", shift+2, " ", "bottom funnels:");
+    printf("%*s" "%s\n", shift+2, " ", "INPUT BUFFERS:");
     for (i=0; i<funnel->in_count; i++) {
         print_buffer(funnel->in[i], shift+2);
     }
@@ -117,7 +118,7 @@ buffers_nonempty(struct buffer **in, size_t in_count)
 {
     size_t i;
     for (i=0; i<in_count; i++) {
-        if (buffer_empty(in[0])) {
+        if (buffer_empty(in[i])) {
            return 0;
         }
     }
@@ -130,7 +131,7 @@ buffers_empty(struct buffer **in, size_t in_count)
 {
     size_t i;
     for (i=0; i<in_count; i++) {
-        if (!buffer_empty(in[0])) {
+        if (!buffer_empty(in[i])) {
            return 0;
         }
     }
@@ -204,19 +205,16 @@ funnel_new(struct buffer **in, struct buffer *out, const size_t size, const size
 {
     struct funnel *funnel = (struct funnel *)
                malloc(sizeof(struct funnel));
-
     funnel->in = in;
     funnel->in_count = in_count;
     funnel->out = out;
     funnel->size = size;
- 
     if (in_count * size < M/4.0) { // maybe not M/4?
         funnel->bb_count = 0;
         funnel->bottom = NULL;
         funnel->top = NULL;
         return funnel;
     }
-
     int i;
     double root = sqrt(in_count);
     struct buffer **curr = in;
@@ -280,7 +278,6 @@ funnel_new(struct buffer **in, struct buffer *out, const size_t size, const size
         tfunnel = funnel_new(buffers, out, size, froot);
         funnel->top = tfunnel;
     }
-
     return funnel;
 }
 
@@ -301,6 +298,7 @@ buffers_create(void *data, const size_t nmemb, const size_t size,
         size_t rest = nmemb - len * count;
         buffers[i] = buffer_create(p, rest, size, 0, 0, rest);
     }
+    
     return buffers;
 }
 
@@ -310,7 +308,7 @@ funnel_create(void *data, const size_t nmemb, const size_t size, const size_t co
 {
     struct buffer **in_buffers = buffers_create(data, nmemb, size, count, len, extra);
     struct buffer *out_buffer = buffer_new(nmemb, size);
-    return funnel_new(in_buffers, out_buffer, size, count);
+    return funnel_new(in_buffers, out_buffer, size, count+extra);
 }
 
 
@@ -318,7 +316,7 @@ void
 funnel_fill(struct funnel *funnel, const cmp_t cmp)
 {
     if (buffers_nonempty(funnel->in, funnel->in_count)) {
-        while (!buffer_full(funnel->out)) {
+        while (!buffer_full(funnel->out)){// && !buffers_empty(funnel->in, funnel->in_count)) {
             size_t best_num = get_best_buffer_num(funnel->in, funnel->in_count, cmp);
 //            printf("best buffer: %d\n", (int)best_num);
 //            print_buffer(funnel->in[best_num], 4);          
@@ -334,8 +332,6 @@ funnel_fill(struct funnel *funnel, const cmp_t cmp)
         }
     }
     else {
-        printf("out funnel_fill");
-        print_funnel(funnel, 0);
         return;
     }
 }
@@ -345,12 +341,12 @@ void
 funnel_warmup(struct funnel *funnel, const cmp_t cmp)
 {
     if (funnel->bb_count) {
-        funnel_warmup(funnel->top, cmp);
         size_t i;
         for (i=0; i<funnel->bb_count; i++) {
             funnel_warmup(funnel->bottom[i], cmp);
         }
     }
+    funnel_warmup(funnel->top, cmp);
     funnel_fill(funnel, cmp);
 }
 
@@ -377,11 +373,9 @@ sort(void *ptr, const size_t nmemb, const size_t size, const cmp_t cmp)
                sort(p, rest, size, cmp);
                extra++;
            }
-
            struct funnel *funnel = funnel_create(ptr, nmemb, size, n, len, extra); 
-
            funnel_warmup(funnel, cmp);
            funnel_fill(funnel, cmp);
-//           memcpy(ptr, funnel->out, nmemb*size);
-    }
+           memcpy(ptr, funnel->out->data, nmemb*size);
+    } 
 }

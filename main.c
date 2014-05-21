@@ -20,8 +20,11 @@ int main(int argc, char *argv[])
     (void) argc;
     (void) argv;
 
-    int arr[] = {3, 1, 4, 2, 5, 7, 10, 9, 8, 6, 16, 14, 12, 11, 13, 15};
-    sort((void *)arr, 16, sizeof(int), cmp_int);
-    print_array(arr, 16);
+    int arr[1358], i;
+    for (i=0; i<1024; i++)
+        arr[i] = 1024-i;
+//    print_array(arr, 1024);
+    sort((void *)arr, 1024, sizeof(int), cmp_int);
+    print_array(arr, 1024);
     return 0;
 }
