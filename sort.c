@@ -318,17 +318,11 @@ funnel_fill(struct funnel *funnel, const cmp_t cmp)
     if (buffers_nonempty(funnel->in, funnel->in_count)) {
         while (!buffer_full(funnel->out)){// && !buffers_empty(funnel->in, funnel->in_count)) {
             size_t best_num = get_best_buffer_num(funnel->in, funnel->in_count, cmp);
-//            printf("best buffer: %d\n", (int)best_num);
-//            print_buffer(funnel->in[best_num], 4);          
-//            print_buffer(funnel->out, 8);
             enqueue(funnel->out, dequeue(funnel->in[best_num])); 
-//            print_buffer(funnel->in[best_num], 4);
-//            print_buffer(funnel->out, 8);
+/*	    need fill in?
             if (buffer_empty(funnel->in[best_num])) {
-                if (funnel->bottom != NULL) {
-                    funnel_fill(funnel->bottom[best_num], cmp);        
-                }
             }
+*/
         }
     }
     else {
@@ -346,7 +340,6 @@ funnel_warmup(struct funnel *funnel, const cmp_t cmp)
             funnel_warmup(funnel->bottom[i], cmp);
         }
     }
-    funnel_warmup(funnel->top, cmp);
     funnel_fill(funnel, cmp);
 }
 
@@ -354,7 +347,7 @@ funnel_warmup(struct funnel *funnel, const cmp_t cmp)
 void
 sort(void *ptr, const size_t nmemb, const size_t size, const cmp_t cmp)
 {
-    if (nmemb * size < M/4.0) { // maybe not M/4?
+    if (nmemb * size < M/4) { // maybe not M/4?
         qsort(ptr, nmemb, size, cmp); 
     }
     else {
@@ -373,9 +366,9 @@ sort(void *ptr, const size_t nmemb, const size_t size, const cmp_t cmp)
                sort(p, rest, size, cmp);
                extra++;
            }
-           struct funnel *funnel = funnel_create(ptr, nmemb, size, n, len, extra); 
-           funnel_warmup(funnel, cmp);
-           funnel_fill(funnel, cmp);
-           memcpy(ptr, funnel->out->data, nmemb*size);
+          struct funnel *funnel = funnel_create(ptr, nmemb, size, n, len, extra); 
+//         ??  funnel_warmup(funnel, cmp);
+          funnel_fill(funnel, cmp);
+          memcpy(ptr, funnel->out->data, nmemb*size);
     } 
 }

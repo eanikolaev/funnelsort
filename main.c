@@ -1,5 +1,6 @@
 #include "sort.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 int cmp_int(const void * x, const void * y)
 {
@@ -17,14 +18,28 @@ void print_array(int *arr, int nmemb)
 
 int main(int argc, char *argv[])
 {
-    (void) argc;
-    (void) argv;
+    if (argc != 3 && argc != 4) {
+        printf("usage: %s nmemb size [filename]\n", argv[0] );
+        return -1;
+    }
 
-    int arr[1358], i;
-    for (i=0; i<1024; i++)
-        arr[i] = 1024-i;
-//    print_array(arr, 1024);
-    sort((void *)arr, 1024, sizeof(int), cmp_int);
-    print_array(arr, 1024);
+/*
+	TODO:
+    if (argc == 4) {
+        read file
+    }
+*/     
+    size_t nmemb=atoi(argv[1]), size=atoi(argv[2]);
+    int *arr = (int*)malloc(nmemb*size);
+    size_t i, n=nmemb*size/sizeof(int);
+    for (i=0; i<n; i++)
+        arr[i] = rand() % nmemb;
+
+    printf("BEFORE sort:\n");
+    print_array(arr, n);
+    sort((void *)arr, nmemb, size, cmp_int);
+
+    printf("\nAFTER sort:\n");
+    print_array(arr, n);
     return 0;
 }
