@@ -4,34 +4,11 @@
 #include <math.h>
 #include <stdio.h>
 #define M 128
-
-
-struct buffer { // FIFO queue
-    void *data;
-    size_t nmemb; // max count of elements
-    size_t size;  // size of one element
-    size_t head;
-    size_t tail;
-    size_t count; // current count of elements
-};
-
-
-struct funnel {
-    struct buffer **in; // input arrays represented as buffers
-    size_t in_count; // count of input arrays (buffers)
-
-    struct buffer **buffers;
-    struct funnel **bottom;
-    size_t bb_count; // count of bottom funnels = count of buffers
-
-    size_t size; // size of one element
-    struct funnel *top;
-    struct buffer *out;
-};
-
+#include "buffer.h"
+#include "funnel.h"
 
 void
-print_buffer(struct buffer *buffer, int shift)
+print_buffer(struct Buffer *buffer, int shift)
 {
     size_t i;
     printf("%*s" "%s\n", shift, " ", "Buffer");
@@ -49,7 +26,7 @@ print_buffer(struct buffer *buffer, int shift)
 
 
 void
-print_funnel(struct funnel *funnel, int shift)
+print_funnel(struct Funnel *funnel, int shift)
 {
     if (funnel == NULL) {
         printf("%*s" "%s\n", shift+2, " ", "NULL");
@@ -81,7 +58,7 @@ print_funnel(struct funnel *funnel, int shift)
 
 
 void
-enqueue(struct buffer* buffer, void *el)
+buffer_enqueue(struct Buffer* buffer, void *el)
 {
     memcpy(buffer->data + buffer->size * buffer->tail, el, buffer->size);
     buffer->tail = (buffer->tail + 1) % buffer->nmemb;
@@ -90,7 +67,7 @@ enqueue(struct buffer* buffer, void *el)
 
 
 void *
-dequeue(struct buffer* buffer)
+buffer_dequeue(struct Buffer* buffer)
 {
     size_t head = buffer->head;
     buffer->head = (buffer->head + 1) % buffer->nmemb;
@@ -100,21 +77,21 @@ dequeue(struct buffer* buffer)
 
 
 int
-buffer_empty(struct buffer *buffer)
+buffer_empty(struct Buffer *buffer)
 {
     return !buffer->count;
 }
 
 
 int
-buffer_full(struct buffer *buffer)
+buffer_full(struct Buffer *buffer)
 {
     return (buffer->count == buffer->nmemb);
 }
 
 
 int
-buffers_nonempty(struct buffer **in, size_t in_count)
+buffers_nonempty(struct Buffer **in, size_t in_count)
 {
     size_t i;
     for (i=0; i<in_count; i++) {
@@ -127,7 +104,7 @@ buffers_nonempty(struct buffer **in, size_t in_count)
 
 
 int
-buffers_empty(struct buffer **in, size_t in_count)
+buffers_empty(struct Buffer **in, size_t in_count)
 {
     size_t i;
     for (i=0; i<in_count; i++) {
@@ -140,14 +117,14 @@ buffers_empty(struct buffer **in, size_t in_count)
 
 
 void *
-buffer_head(struct buffer *buffer)
+buffer_head(struct Buffer *buffer)
 {
     return buffer->data + buffer->head * buffer->size;
 }
 
 
 size_t
-get_best_buffer_num(struct buffer **in, size_t in_count, const cmp_t cmp)
+get_best_buffer_num(struct Buffer **in, size_t in_count, const cmp_t cmp)
 {
     size_t i,j, best;
     for (i=0; i<in_count; i++) {        
@@ -177,11 +154,11 @@ get_buffer_nmemb(const int bot_nmemb, const int top_nmemb)
 }
 
 
-struct buffer *
+struct Buffer *
 buffer_create(void *data, const size_t nmemb, const size_t size, const size_t head, const size_t tail, const size_t count)
 {
-    struct buffer *buffer = (struct buffer *)
-               malloc(sizeof(struct buffer));
+    struct Buffer *buffer = (struct Buffer *)
+               malloc(sizeof(struct Buffer));
     buffer->data = data;
     buffer->nmemb = nmemb;
     buffer->size = size;
@@ -192,7 +169,7 @@ buffer_create(void *data, const size_t nmemb, const size_t size, const size_t he
 }
 
 
-struct buffer *
+struct Buffer *
 buffer_new(const size_t nmemb, const size_t size)
 { // create empty buffer (initialize FIFO queue)
     void *data = (void *) malloc(nmemb*size);
@@ -200,11 +177,11 @@ buffer_new(const size_t nmemb, const size_t size)
 }
 
 
-struct funnel *
-funnel_new(struct buffer **in, struct buffer *out, const size_t size, const size_t in_count)
+struct Funnel *
+funnel_new(struct Buffer **in, struct Buffer *out, const size_t size, const size_t in_count)
 {
-    struct funnel *funnel = (struct funnel *)
-               malloc(sizeof(struct funnel));
+    struct Funnel *funnel = (struct Funnel *)
+               malloc(sizeof(struct Funnel));
     funnel->in = in;
     funnel->in_count = in_count;
     funnel->out = out;
@@ -217,7 +194,7 @@ funnel_new(struct buffer **in, struct buffer *out, const size_t size, const size
     }
     int i;
     double root = sqrt(in_count);
-    struct buffer **curr = in;
+    struct Buffer **curr = in;
     int froot = floor(root);
 
     if (froot*froot < (int)in_count) { // if in_count isn't square
@@ -228,11 +205,11 @@ funnel_new(struct buffer **in, struct buffer *out, const size_t size, const size
         int all_count = big_count + small_count; // size of top funnel
         int big_buff_nmemb   = get_buffer_nmemb(croot, all_count);
         int small_buff_nmemb = get_buffer_nmemb(froot, all_count);
-        struct buffer **buffers = (struct buffer**)
-                  malloc(sizeof(struct buffer *)*all_count); // intermediate buffers
+        struct Buffer **buffers = (struct Buffer**)
+                  malloc(sizeof(struct Buffer *)*all_count); // intermediate buffers
 
-        struct funnel **bfunnels = (struct funnel **)
-                  malloc(sizeof(struct funnel *)*all_count); // bottom funnels
+        struct Funnel **bfunnels = (struct Funnel **)
+                  malloc(sizeof(struct Funnel *)*all_count); // bottom funnels
 
         for (i=0; i<big_count; i++) {
             buffers[i] = buffer_new(big_buff_nmemb, size);
@@ -250,18 +227,18 @@ funnel_new(struct buffer **in, struct buffer *out, const size_t size, const size
         funnel->buffers = buffers;
         funnel->bottom = bfunnels;
 
-        struct funnel *tfunnel = (struct funnel *)
-                  malloc(sizeof(struct funnel *));
+        struct Funnel *tfunnel = (struct Funnel *)
+                  malloc(sizeof(struct Funnel *));
         tfunnel = funnel_new(buffers, out, size, all_count);
         funnel->top = tfunnel;
     }
     else {
         funnel->bb_count = froot;
-        struct buffer **buffers = (struct buffer**)
-                  malloc(sizeof(struct buffer *)*froot); // intermediate buffers
+        struct Buffer **buffers = (struct Buffer**)
+                  malloc(sizeof(struct Buffer *)*froot); // intermediate buffers
 
-        struct funnel **bfunnels = (struct funnel **)
-                  malloc(sizeof(struct funnel *)*froot); // bottom funnels
+        struct Funnel **bfunnels = (struct Funnel **)
+                  malloc(sizeof(struct Funnel *)*froot); // bottom funnels
         int buff_nmemb = 2 * pow(froot, 1.5);
         
         for (i=0; i<froot; i++) {
@@ -273,8 +250,8 @@ funnel_new(struct buffer **in, struct buffer *out, const size_t size, const size
         funnel->buffers = buffers;
         funnel->bottom = bfunnels;
 
-        struct funnel *tfunnel = (struct funnel *)
-                  malloc(sizeof(struct funnel *));
+        struct Funnel *tfunnel = (struct Funnel *)
+                  malloc(sizeof(struct Funnel *));
         tfunnel = funnel_new(buffers, out, size, froot);
         funnel->top = tfunnel;
     }
@@ -282,12 +259,12 @@ funnel_new(struct buffer **in, struct buffer *out, const size_t size, const size
 }
 
 
-struct buffer **
+struct Buffer **
 buffers_create(void *data, const size_t nmemb, const size_t size,
                                      const size_t count, const size_t len, const size_t extra)
 { // divide data into count (+extra) buffers
     
-    struct buffer **buffers = (struct buffer **)malloc(sizeof(struct buffer*)*(count + extra)); 
+    struct Buffer **buffers = (struct Buffer **)malloc(sizeof(struct Buffer*)*(count + extra)); 
     size_t i, d = len*size;
     void *p = data;
     for (i=0; i<count; i++) {
@@ -303,22 +280,22 @@ buffers_create(void *data, const size_t nmemb, const size_t size,
 }
 
 
-struct funnel *
+struct Funnel *
 funnel_create(void *data, const size_t nmemb, const size_t size, const size_t count, const size_t len, const size_t extra)
 {
-    struct buffer **in_buffers = buffers_create(data, nmemb, size, count, len, extra);
-    struct buffer *out_buffer = buffer_new(nmemb, size);
+    struct Buffer **in_buffers = buffers_create(data, nmemb, size, count, len, extra);
+    struct Buffer *out_buffer = buffer_new(nmemb, size);
     return funnel_new(in_buffers, out_buffer, size, count+extra);
 }
 
 
 void
-funnel_fill(struct funnel *funnel, const cmp_t cmp)
+funnel_fill(struct Funnel *funnel, const cmp_t cmp)
 {
     if (buffers_nonempty(funnel->in, funnel->in_count)) {
         while (!buffer_full(funnel->out)){// && !buffers_empty(funnel->in, funnel->in_count)) {
             size_t best_num = get_best_buffer_num(funnel->in, funnel->in_count, cmp);
-            enqueue(funnel->out, dequeue(funnel->in[best_num])); 
+            buffer_enqueue(funnel->out, buffer_dequeue(funnel->in[best_num])); 
 /*	    need fill in?
             if (buffer_empty(funnel->in[best_num])) {
             }
@@ -332,7 +309,7 @@ funnel_fill(struct funnel *funnel, const cmp_t cmp)
 
 
 void
-funnel_warmup(struct funnel *funnel, const cmp_t cmp)
+funnel_warmup(struct Funnel *funnel, const cmp_t cmp)
 {
     if (funnel->bb_count) {
         size_t i;
@@ -366,7 +343,7 @@ sort(void *ptr, const size_t nmemb, const size_t size, const cmp_t cmp)
                sort(p, rest, size, cmp);
                extra++;
            }
-          struct funnel *funnel = funnel_create(ptr, nmemb, size, n, len, extra); 
+          struct Funnel *funnel = funnel_create(ptr, nmemb, size, n, len, extra); 
 //         ??  funnel_warmup(funnel, cmp);
           funnel_fill(funnel, cmp);
           memcpy(ptr, funnel->out->data, nmemb*size);
